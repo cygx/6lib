@@ -3,43 +3,51 @@ use v6;
 use fatal;
 use nqp;
 
-sub GENERATE-USAGE(|args) {
-    my $*PROGRAM-NAME = '6lib';
-    &*GENERATE-USAGE(|args);
+PROCESS::<$PROGRAM-NAME> := '6lib';
+
+my \repo = '.6lib'.IO;
+my \idx = repo.add('lib.list');
+
+sub load($_, :$set) {
+    my %set;
+    for .lines {
+        when .starts-with('+') { %set{.substr(1)} := True }
+        when .starts-with('-') { %set{.substr(1)}:delete }
+    }
+    $set ?? %set !! %set.keys.sort;
 }
 
-my $repo = '.6lib'.IO;
-my $list = $repo.add('lib.list');
+sub with-file($file, &block = {;}, *%_) {
+    given $file.open(|%_) {
+        LEAVE .close;
+        .&block;
+    }
+}
 
 sub rmtree($_, $root = $_, :%keep) {
     for .dir {
         when .d { .&rmtree($root, :%keep) }
-        when .e { try .unlink unless %keep{.relative($root)}:exists }
+        default {
+            unless %keep && (%keep{.relative($root)}:exists) {
+                try .unlink;
+                note "-{.relative($root)}" if $*logged;
+            }
+        }
     }
     try .rmdir;
 }
 
-sub loadset($src) {
-    my %set;
-    for $src.lines {
-        when .starts-with('+') { %set{.substr(1)} := True }
-        when .starts-with('-') { %set{.substr(1)}:delete }
-    }
-    %set;
-}
-
-sub addlinks($_, $root = $_, :$take) {
+sub lntree($_, $root = $_, :$take) {
     for .dir(test => *.starts-with('.').not) {
-        when .l {}
-        when .d { .&addlinks($root, :$take) }
-        when .f {
+        when .d { .&lntree($root, :$take) }
+        default {
             my $path = .relative($root);
-            my $link = $repo.add($path);
+            my $link = repo.add($path);
             unless $link.l && nqp::readlink(~$link) eq $_ {
-                note "added: $path";
-                $link.unlink if $link.e;
-                $link.parent.mkdir;
+                if $link.e { $link.unlink }
+                else { $link.parent.mkdir }
                 .symlink($link);
+                note "+$path" if $*logged;
             }
             take $path if $take;
         }
@@ -48,82 +56,97 @@ sub addlinks($_, $root = $_, :$take) {
 
 #| create repository in current working directory
 multi MAIN('init') {
-    $repo.mkdir;
-    $list.open(:x).close;
+    repo.mkdir;
+    idx.&with-file(:x);
 }
 
 #| eagerly add libs to repository
 multi MAIN('add', *@libs) {
-    my %list := $list.&loadset;
-    my (%new, @todo);
+    my $*logged = True;
+    my %index := idx.&load(:set);
+    my (%new, @todo, @notfound);
+
     for @libs {
         my $dir = .IO.resolve;
         my $libdir = $dir.add('lib');
-        my $abspath = ~$dir;
+        my $key = ~$dir;
         if $libdir.d {
-            %new{$abspath} = True unless %list{$abspath}:exists;
+            %new{$key} = True unless %index{$key}:exists;
             @todo.push($libdir);
         }
-        else { note "not added: $_"; }
+        else { @notfound.push($_) }
     }
 
-    .&addlinks for @todo;
+    .&lntree for @todo;
 
-    given $list.open(:a) {
-        LEAVE .close;
-        for %new.keys.sort -> $lib {
-            .print("\n+$lib");
-        }
+    with-file idx, :a, -> $out {
+        $out.print("\n+$_")
+            for %new.keys.sort;
     }
+
+    note 'not found: ', @notfound.join(', ')
+        if @notfound;
 }
 
 #| lazily remove libs from repository
 multi MAIN('rm', *@libs) {
-    my %list := $list.&loadset;
-    given $list.open(:a) {
-        LEAVE .close;
-        for @libs -> $path {
-            my $abspath = $path.IO.resolve.Str;
-            if %list{$abspath}:exists {
-                .print("\n-$abspath");
+    my %index := idx.&load(:set);
+    my @unknown;
+
+    with-file idx, :a, -> $out {
+        for @libs {
+            my $key = ~.IO.resolve;
+            if %index{$key}:exists {
+                $out.print("\n-$key");
             }
-            else { note "unknown: $path" }
+            else { @unknown.push($_) }
         }
     }
+
+    note 'not indexed: ', @unknown.join(', ')
+        if @unknown;
 }
 
 #| synchronize repository with indexed libs
 multi MAIN('sync') {
-    my @list = $list.&loadset.keys.sort;
-    my %keep = $list.basename => True;
+    my $*logged = True;
+    my @libs = idx.&load;
+    my %keep = idx.basename => True, '.precomp' => True;
+    my @missing;
 
-    for @list {
+    for @libs {
         my $libdir = .IO.add('lib');
         if $libdir.d {
             %keep{$_} = True
-                for gather $libdir.&addlinks(:take);
+                for gather  $libdir.&lntree(:take);
         }
-        else { note "missing: $_" }
+        else { @missing.push($_) }
     }
 
-    $repo.&rmtree(:%keep);
-    $list.spurt: @list.map({ "+$_" }).join("\n");
+    repo.&rmtree(:%keep);
+
+    with-file idx, :w, -> $out {
+        $out.print("\n+$_")
+            for @libs;
+    }
+
+    note 'not found: ', @missing.join(', ')
+        if @missing;
 }
 
 #| list indexed libs
 multi MAIN('list') {
-    .put for $list.&loadset.keys.sort;
+    .put for idx.&load;
 }
 
 #| lazily remove missing libs from index
 multi MAIN('prune') {
-    my @list = $list.&loadset.keys.sort;
-    given $list.open(:a) {
-        LEAVE .close;
-        for @list -> $path {
-            unless $path.IO.add('lib').d {
-                note "pruned: $path";
-                .print("\n-$path");
+    my @libs = idx.&load;
+    with-file idx, :a, -> $out {
+        for @libs {
+            unless .IO.add('lib').d {
+                note $_;
+                $out.print("\n-$_");
             }
         }
     }
@@ -131,15 +154,15 @@ multi MAIN('prune') {
 
 #| delete precompilation cache
 multi MAIN('flush') {
-    $repo.add('.precomp').&rmtree;
+    repo.add('.precomp').&rmtree;
 }
 
 #| clear repository but keep index
 multi MAIN('clear') {
-    $repo.&rmtree(:keep{ $list.basename => True });
+    repo.&rmtree(:keep{ idx.basename => True });
 }
 
 #| remove repository
 multi MAIN('clobber') {
-    $repo.&rmtree;
+    repo.&rmtree;
 }
