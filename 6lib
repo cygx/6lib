@@ -129,6 +129,11 @@ multi MAIN('prune') {
     }
 }
 
+#| delete precompilation cache
+multi MAIN('flush') {
+    $repo.add('.precomp').&rmtree;
+}
+
 #| clear repository but keep index
 multi MAIN('clear') {
     $repo.&rmtree(:keep{ $list.basename => True });
