@@ -35,7 +35,7 @@ sub addlinks($_, $root = $_, :$take) {
         when .f {
             my $path = .relative($root);
             my $link = $repo.add($path);
-            unless $link.e && nqp::readlink(~$link) eq $_ {
+            unless $link.l && nqp::readlink(~$link) eq $_ {
                 note "added: $path";
                 $link.unlink if $link.e;
                 $link.parent.mkdir;
