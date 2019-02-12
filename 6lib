@@ -46,7 +46,7 @@ sub addlinks($_, $root = $_, :$take) {
     }
 }
 
-#| create repository in the current working directory
+#| create repository in current working directory
 multi MAIN('init') {
     $repo.mkdir;
     $list.open(:x).close;
@@ -64,7 +64,7 @@ multi MAIN('add', *@libs) {
             %new{$abspath} = True unless %list{$abspath}:exists;
             @todo.push($libdir);
         }
-        else { note "not found: $_"; }
+        else { note "not added: $_"; }
     }
 
     .&addlinks for @todo;
@@ -94,28 +94,39 @@ multi MAIN('rm', *@libs) {
 
 #| synchronize repository with indexed libs
 multi MAIN('sync') {
-    my %list := $list.&loadset;
+    my @list = $list.&loadset.keys.sort;
     my %keep = $list.basename => True;
 
-    for %list.keys.eager {
+    for @list {
         my $libdir = .IO.add('lib');
         if $libdir.d {
             %keep{$_} = True
                 for gather $libdir.&addlinks(:take);
         }
-        else {
-            note "not found: $_";
-            %list{$_}:delete;
-        }
+        else { note "missing: $_" }
     }
 
     $repo.&rmtree(:%keep);
-    $list.spurt: %list.keys.sort.map({ "+$_" }).join("\n");
+    $list.spurt: @list.map({ "+$_" }).join("\n");
 }
 
 #| list indexed libs
 multi MAIN('list') {
     .put for $list.&loadset.keys.sort;
+}
+
+#| lazily remove missing libs from index
+multi MAIN('prune') {
+    my @list = $list.&loadset.keys.sort;
+    given $list.open(:a) {
+        LEAVE .close;
+        for @list -> $path {
+            unless $path.IO.add('lib').d {
+                note "pruned: $path";
+                .print("\n-$path");
+            }
+        }
+    }
 }
 
 #| clear repository but keep index
