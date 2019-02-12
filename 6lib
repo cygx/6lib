@@ -26,7 +26,10 @@ sub with-file($file, &block = {;}, *%_) {
 
 sub rmtree($_, $root = $_, :%keep) {
     for .dir {
-        when .d { .&rmtree($root, :%keep) }
+        when .d {
+            .&rmtree($root, :%keep)
+                unless %keep && (%keep{.relative($root)}:exists);
+        }
         default {
             unless %keep && (%keep{.relative($root)}:exists) {
                 try .unlink;
