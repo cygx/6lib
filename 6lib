@@ -57,7 +57,7 @@ sub lntree($_, $root = $_, :$take) {
 #| create repository in current working directory
 multi MAIN('init') {
     repo.mkdir;
-    idx.&with-file(:x);
+    idx.open(:x).close;
 }
 
 #| eagerly add libs to repository
