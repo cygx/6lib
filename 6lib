@@ -49,7 +49,7 @@ sub addlinks($_, $root = $_, :$take) {
 #| create repository in the current working directory
 multi MAIN('init') {
     $repo.mkdir;
-    $list.open(:w).close;
+    $list.open(:x).close;
 }
 
 #| eagerly add libs to repository
