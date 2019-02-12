@@ -1,0 +1,129 @@
+#!/usr/bin/env perl6
+use v6;
+use fatal;
+use nqp;
+
+sub GENERATE-USAGE(|args) {
+    my $*PROGRAM-NAME = '6lib';
+    &*GENERATE-USAGE(|args);
+}
+
+my $repo = '.6lib'.IO;
+my $list = $repo.add('lib.list');
+
+sub rmtree($_, $root = $_, :%keep) {
+    for .dir {
+        when .d { .&rmtree($root, :%keep) }
+        when .e { try .unlink unless %keep{.relative($root)}:exists }
+    }
+    try .rmdir;
+}
+
+sub loadset($src) {
+    my %set;
+    for $src.lines {
+        when .starts-with('+') { %set{.substr(1)} := True }
+        when .starts-with('-') { %set{.substr(1)}:delete }
+    }
+    %set;
+}
+
+sub addlinks($_, $root = $_, :$take) {
+    for .dir(test => *.starts-with('.').not) {
+        when .l {}
+        when .d { .&addlinks($root, :$take) }
+        when .f {
+            my $path = .relative($root);
+            my $link = $repo.add($path);
+            unless $link.e && nqp::readlink(~$link) eq $_ {
+                note "added: $path";
+                $link.unlink if $link.e;
+                $link.parent.mkdir;
+                .symlink($link);
+            }
+            take $path if $take;
+        }
+    }
+}
+
+#| create repository in the current working directory
+multi MAIN('init') {
+    $repo.mkdir;
+    $list.open(:w).close;
+}
+
+#| eagerly add libs to repository
+multi MAIN('add', *@libs) {
+    my %list := $list.&loadset;
+    my (%new, @todo);
+    for @libs {
+        my $dir = .IO.resolve;
+        my $libdir = $dir.add('lib');
+        my $abspath = ~$dir;
+        if $libdir.d {
+            %new{$abspath} = True unless %list{$abspath}:exists;
+            @todo.push($libdir);
+        }
+        else { note "not found: $_"; }
+    }
+
+    .&addlinks for @todo;
+
+    given $list.open(:a) {
+        LEAVE .close;
+        for %new.keys.sort -> $lib {
+            .print("\n+$lib");
+        }
+    }
+}
+
+#| lazily remove libs from repository
+multi MAIN('rm', *@libs) {
+    my %list := $list.&loadset;
+    given $list.open(:a) {
+        LEAVE .close;
+        for @libs -> $path {
+            my $abspath = $path.IO.resolve.Str;
+            if %list{$abspath}:exists {
+                .print("\n-$abspath");
+            }
+            else { note "unknown: $path" }
+        }
+    }
+}
+
+#| synchronize repository with indexed libs
+multi MAIN('sync') {
+    my %list := $list.&loadset;
+    my %keep = $list.basename => True;
+
+    for %list.keys.eager {
+        my $libdir = .IO.add('lib');
+        if $libdir.d {
+            %keep{$_} = True
+                for gather $libdir.&addlinks(:take);
+        }
+        else {
+            note "not found: $_";
+            %list{$_}:delete;
+        }
+    }
+
+    $repo.&rmtree(:%keep);
+    $list.spurt: %list.keys.sort.map({ "+$_" }).join("\n");
+}
+
+#| list indexed libs
+multi MAIN('list') {
+    .put for $list.&loadset.keys.sort;
+}
+
+#| clear repository but keep index
+multi MAIN('clear') {
+    $repo.&rmtree(:keep{ $list.basename => True });
+}
+
+#| remove repository
+multi MAIN('clobber') {
+    $repo.&rmtree;
+}
