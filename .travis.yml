@@ -1,0 +1,15 @@
+notifications:
+  email: false
+branches:
+  except:
+    - gh-pages
+language: perl6
+sudo: false
+perl6:
+  - latest
+install:
+  - rakudobrew build-zef
+script:
+  - zef install .
+  - 6lib init
+  - ls .6lib
