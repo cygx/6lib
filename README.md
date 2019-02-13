@@ -21,7 +21,7 @@ Usage:
 
 # Example Usage
 
-```
+```shell
 perl6 -Ilib -I../other/lib script.p6
 
 # equivalent call using a local repository
