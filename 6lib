@@ -30,7 +30,7 @@ sub with-file($file, &block = {;}, *%_) {
 
 sub rmtree($_, $root = $_, :%keep) {
     for .dir {
-        when .d {
+        when .d && !.l {
             .&rmtree($root, :%keep)
                 unless %keep && (%keep{.relative($root)}:exists);
         }
@@ -46,7 +46,7 @@ sub rmtree($_, $root = $_, :%keep) {
 
 sub lntree($_, $root = $_, :$take) {
     for .dir(test => *.starts-with('.').not) {
-        when .d { .&lntree($root, :$take) }
+        when .d && !.l { .&lntree($root, :$take) }
         default {
             my $path = .relative($root);
             my $link = repo.add($path);
