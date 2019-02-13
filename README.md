@@ -38,8 +38,8 @@ Paths to module directories are kept in an index file `.6lib/lib.list`.
 # A Note on Windows Usage
 
 The creation of symbolic links in non-administrator mode is only permitted
-if 'Developer mode' has been enabled. This can be done in Windows 10 in the
-settings under 'Update & security' / 'For developers'.
+if *Developer mode* has been enabled. This can be done in Windows 10 in the
+settings under *Update & security* / *For developers*.
 
 
 # Bugs and Development
