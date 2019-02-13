@@ -9,8 +9,8 @@ use nqp;
 
 PROCESS::<$PROGRAM-NAME> := '6lib';
 
-my \repo = '.6lib'.IO;
-my \idx = repo.add('lib.list');
+my \repo = my $ = '.6lib'.IO;
+my \idx = my $ = repo.add('lib.list');
 
 sub load($_, :$set) {
     my %set;
@@ -172,4 +172,12 @@ multi MAIN('clear') {
 #| remove repository
 multi MAIN('clobber') {
     repo.&rmtree;
+}
+
+#| specify location of target repository
+multi MAIN(IO() $dir, *@command, Bool :$C!) {
+    repo = $dir.add(repo.basename);
+    idx = repo.add(idx.basename);
+    MAIN |@command;
+    CATCH { when X::Multi::NoMatch { note $*USAGE  } }
 }
