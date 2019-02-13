@@ -43,6 +43,9 @@ Modules are identified by their absolute paths. For each file in a module's
 
 Paths to module directories are kept in an index file `.6lib/lib.list`.
 
+### Warning
+
+When adding source files to a module's `lib` directory, you need to re-add the module or call `6lib sync` afterwards!
 
 # A Note on Windows Usage
 
