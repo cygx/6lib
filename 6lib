@@ -179,5 +179,5 @@ multi MAIN(IO() $dir, *@command, Bool :$C!) {
     repo = $dir.add(repo.basename);
     idx = repo.add(idx.basename);
     MAIN |@command;
-    CATCH { when X::Multi::NoMatch { note $*USAGE  } }
+    CATCH { when X::Multi::NoMatch { note $*USAGE } }
 }
