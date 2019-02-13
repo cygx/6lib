@@ -16,15 +16,24 @@ Usage:
   6lib flush -- delete precompilation cache
   6lib clear -- clear repository but keep index
   6lib clobber -- remove repository
+  6lib -C <dir> [<command> ...] -- specify location of target repository
 ```
+
+# Example Usage
 
 ```
 perl6 -Ilib -I../other/lib script.p6
 
-# equivalent call using 6lib
+# equivalent call using a local repository
 6lib init
 6lib add . ../other
 perl6 -I.6lib script.p6
+
+# equivalent call using a global repository
+export PERL6LIB=$HOME/.6lib
+6lib -C $HOME init
+6lib -C $HOME add . ../other
+perl6 script.p6
 ```
 
 # Description
