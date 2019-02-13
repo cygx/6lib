@@ -1,6 +1,6 @@
 # 6lib
 
-Manage local symlink-based repositories of Perl6 modules
+Manage symlink-based repositories of local Perl6 modules
 
 
 # Synopsis
