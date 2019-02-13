@@ -1,0 +1,15 @@
+{
+    "perl"        : "6.*",
+    "name"        : "App::SixLib",
+    "description" : "Manage local symlink-based repositories of Perl6 modules",
+    "version"     : "0.0.1",
+    "auth"        : "github:cygx",
+    "authors"     : [ "cygx" ],
+    "license"     : "BSL-1.0",
+    "source-url"  : "git://github.com/cygx/6lib.git",
+    "provides"    : { },
+    "support"     : {
+        "bugtracker" : "https://github.com/cygx/6lib/issues",
+        "source"     : "https://github.com/cygx/6lib"
+    }
+}

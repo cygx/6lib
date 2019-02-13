@@ -1,6 +1,6 @@
 # 6lib
 
-Creates local symlink-based Perl6 module repositories
+Manage local symlink-based repositories of Perl6 modules
 
 
 # Synopsis
